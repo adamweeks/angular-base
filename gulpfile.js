@@ -9,6 +9,9 @@ var bowerFiles  = require('main-bower-files');
 var ghPages     = require('gulp-gh-pages');
 var Q           = require('q');
 var plumber     = require('gulp-plumber');
+var livereload  = require('gulp-livereload');
+var webserver   = require('gulp-webserver');
+
 
 //Configuration
 var buildFolderName = 'build';
@@ -221,5 +224,16 @@ gulp.task('clean-dev', function() {
 });
 
 gulp.task('watch-dev', function() {
-    gulp.watch([paths.scripts, paths.partials, paths.styles, paths.index], ['create-dev']);
+    livereload.listen();
+    gulp.watch([paths.scripts, paths.partials, paths.styles, paths.index], ['build-dev']);
+});
+
+gulp.task('serve', ['build-dev', 'watch-dev'], function() {
+    gulp.src('./dist.dev/')
+        .pipe(webserver({
+            fallback: 'index.html',
+            livereload: true,
+            directoryListing: false,
+            open: true
+        }));
 });
