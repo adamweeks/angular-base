@@ -8,6 +8,7 @@ var inject      = require('gulp-inject');
 var bowerFiles  = require('main-bower-files');
 var ghPages     = require('gulp-gh-pages');
 var Q           = require('q');
+var plumber     = require('gulp-plumber');
 
 //Configuration
 var buildFolderName = 'build';
@@ -17,7 +18,7 @@ var releaseFolder = __dirname + '/' + releaseFolderName + '/';
 
 var paths = {
     scripts: 'src/app/**/*.js',
-    styles: ['./src/app/**/*.css', './src/app/**/*.scss'],
+    styles: './src/content/**/*.css',
     index: './src/index.html',
     partials: ['src/app/**/*.html', '!src/index.html'],
     distDev: './dist.dev',
@@ -38,6 +39,12 @@ gulp.task('test', function (done) {
 
 gulp.task('index',['clean'],function(){
     return gulp.src('./src/index.html')
+        .pipe(plumber({
+            errorHandler: function (err) {
+                console.log(err);
+                this.emit('end');
+            }
+        }))
         .pipe(gulp.dest('./build'));
 });
 
@@ -67,6 +74,12 @@ gulp.task('clean', function() {
  */
 gulp.task('concat', function () {
     return gulp.src(['src/app/**/*.module.js', 'src/app/**/*.js', '!src/app/**/*.spec.js'])
+        .pipe(plumber({
+            errorHandler: function (err) {
+                console.log(err);
+                this.emit('end');
+            }
+        }))
         .pipe(concat('app.js'))
         .pipe(ngAnnotate())
         .pipe(gulp.dest(buildFolder));
@@ -74,12 +87,24 @@ gulp.task('concat', function () {
 
 gulp.task('concat-dev', function() {
     return gulp.src(['src/app/**/*.module.js', 'src/app/**/*.js', '!src/app/**/*.spec.js'])
+        .pipe(plumber({
+            errorHandler: function (err) {
+                console.log(err);
+                this.emit('end');
+            }
+        }))
         .pipe(ngAnnotate())
         .pipe(gulp.dest(paths.distScriptsDev))
 });
 
 gulp.task('index-dev', function() {
     return gulp.src(paths.index)
+        .pipe(plumber({
+            errorHandler: function (err) {
+                console.log(err);
+                this.emit('end');
+            }
+        }))
         .pipe(gulp.dest(paths.distDev));
 });
 
@@ -88,11 +113,23 @@ gulp.task('index-dev', function() {
  */
 gulp.task('css', function () {
     return gulp.src('./src/content/*.css')
+        .pipe(plumber({
+            errorHandler: function (err) {
+                console.log(err);
+                this.emit('end');
+            }
+        }))
         .pipe(gulp.dest('./build/content'));
 });
 
 gulp.task('css-dev', function() {
     return gulp.src('./src/content/*.css')
+        .pipe(plumber({
+            errorHandler: function (err) {
+                console.log(err);
+                this.emit('end');
+            }
+        }))
         .pipe(gulp.dest(paths.distContentDev));
 });
 
@@ -109,11 +146,23 @@ gulp.task('images', function () {
  */
 gulp.task('html', function () {
     return gulp.src('./src/app/**/*.html')
+        .pipe(plumber({
+            errorHandler: function (err) {
+                console.log(err);
+                this.emit('end');
+            }
+        }))
         .pipe(gulp.dest('./build/app'));
 });
 
 gulp.task('html-dev', function() {
-    return gulp.src('./src/app/**/*.html')
+    return gulp.src(paths.partials)
+        .pipe(plumber({
+            errorHandler: function (err) {
+                console.log(err);
+                this.emit('end');
+            }
+        }))
         .pipe(gulp.dest(paths.distScriptsDev));
 });
 
@@ -137,6 +186,12 @@ gulp.task('inject', ['concat', 'css', 'html', 'vendor'], function(){
  */
 gulp.task('inject-dev', ['create-dev'], function(){
     return gulp.src(paths.index)
+        .pipe(plumber({
+            errorHandler: function (err) {
+                console.log(err);
+                this.emit('end');
+            }
+        }))
         .pipe(gulp.dest(paths.distDev))
         .pipe(inject(gulp.src([paths.distScriptsDev + '/**/*.module.js', paths.distScriptsDev + '/**/*.js'], {read: false}), {relative: true, name: ''}))
         .pipe(inject(gulp.src('./dist.dev/vendor/*.js', {read: false}), {name: 'bower', relative: true}))
@@ -144,7 +199,6 @@ gulp.task('inject-dev', ['create-dev'], function(){
         .pipe(inject(gulp.src(paths.distContentDev + '/**/*.css',{read:false}), {relative: true}))
         .pipe(gulp.dest(paths.distDev));
 });
-
 
 gulp.task('create-dev', ['index-dev', 'vendor-dev', 'css-dev', 'html-dev', 'concat-dev']);
 
@@ -164,4 +218,8 @@ gulp.task('clean-dev', function() {
         deferred.resolve();
     });
     return deferred.promise;
+});
+
+gulp.task('watch-dev', function() {
+    gulp.watch([paths.scripts, paths.partials, paths.styles, paths.index], ['create-dev']);
 });
