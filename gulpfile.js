@@ -1,4 +1,5 @@
 var gulp        = require('gulp');
+var plugins     = require('gulp-load-plugins')();
 var concat      = require('gulp-concat');
 var ngAnnotate  = require('gulp-ng-annotate');
 var karma       = require('karma').server;
@@ -6,12 +7,32 @@ var del         = require('del');
 var inject      = require('gulp-inject');
 var bowerFiles  = require('main-bower-files');
 var ghPages     = require('gulp-gh-pages');
+var Q           = require('q');
+var plumber     = require('gulp-plumber');
+var livereload  = require('gulp-livereload');
+var webserver   = require('gulp-webserver');
+
 
 //Configuration
 var buildFolderName = 'build';
 var releaseFolderName = 'release';
 var buildFolder = __dirname + '/' + buildFolderName + '/';
 var releaseFolder = __dirname + '/' + releaseFolderName + '/';
+
+var paths = {
+    scripts: ['src/app/**/*.module.js', 'src/app/**/*.js', '!src/app/**/*.spec.js'],
+    styles: './src/content/**/*.css',
+    index: './src/index.html',
+    partials: ['src/app/**/*.html', '!src/index.html'],
+    distDev: './dist.dev',
+    distContentDev: './dist.dev/content',
+    distVendorDev: './dist.dev/vendor',
+    distScriptsDev: './dist.dev/app',
+    distProd: './dist.prod',
+    distContentProd: './dist.prod/content',
+    distScriptsProd: './dist.prod/scripts',
+    distVendorProd: './dist.prod/vendor'
+};
 
 //Tasks
 gulp.task('test', function (done) {
@@ -21,23 +42,32 @@ gulp.task('test', function (done) {
     }, done);
 });
 
+/**
+ * Creates index.html file in  distribution path
+ */
 gulp.task('index',['clean'],function(){
     return gulp.src('./src/index.html')
-        .pipe(gulp.dest('./build'));
+        .pipe(plumber({
+            errorHandler: function (err) {
+                console.log(err);
+                this.emit('end');
+            }
+        }))
+        .pipe(gulp.dest(paths.distProd));
 });
 
-// Production Build Tasks
 /**
- * Injects release files into index.html
+ * Creates index.html file in development distribution path
  */
-gulp.task('inject', ['concat', 'css', 'html', 'vendor'], function(){
-    return gulp.src('./src/index.html')
-        .pipe(gulp.dest('./build'))
-        .pipe(inject(gulp.src('./build/vendor/*.js', {read: false}), {name: 'bower', relative: true}))
-        .pipe(inject(gulp.src('./build/vendor/*.css', {read: false}), {name: 'bower', relative: true}))
-        .pipe(inject(gulp.src('./build/app.js', {read: false}), {relative: true}))
-        .pipe(inject(gulp.src('./build/content/*.css', {read: false}), {relative: true}))
-        .pipe(gulp.dest('./build'));
+gulp.task('index-dev', function() {
+    return gulp.src(paths.index)
+        .pipe(plumber({
+            errorHandler: function (err) {
+                console.log(err);
+                this.emit('end');
+            }
+        }))
+        .pipe(gulp.dest(paths.distDev));
 });
 
 /**
@@ -45,71 +75,190 @@ gulp.task('inject', ['concat', 'css', 'html', 'vendor'], function(){
  */
 gulp.task('vendor', function () {
     return gulp.src(bowerFiles())
-        .pipe(gulp.dest('./build/vendor'));
+        .pipe(gulp.dest(paths.distVendorProd));
 });
+
+gulp.task('vendor-dev', function() {
+    return gulp.src(bowerFiles())
+        .pipe(gulp.dest(paths.distVendorDev));
+});
+
+/**
+ * Compiles project application scripts into app.js and writes to distribution path
+ */
+gulp.task('scripts', function () {
+    return gulp.src(paths.scripts)
+        .pipe(plumber({
+            errorHandler: function (err) {
+                console.log(err);
+                this.emit('end');
+            }
+        }))
+        .pipe(concat('app.js'))
+        .pipe(ngAnnotate())
+        .pipe(gulp.dest(paths.distScriptsProd));
+});
+
+/**
+ * Compiles project application scripts into the development distribustion location
+ */
+gulp.task('scripts-dev', function() {
+    return gulp.src(paths.scripts)
+        .pipe(plumber({
+            errorHandler: function (err) {
+                console.log(err);
+                this.emit('end');
+            }
+        }))
+        .pipe(ngAnnotate())
+        .pipe(gulp.dest(paths.distScriptsDev))
+});
+
+/**
+ * Processes application css to dist path
+ */
+gulp.task('css', function () {
+    return gulp.src('./src/content/*.css')
+        .pipe(plumber({
+            errorHandler: function (err) {
+                console.log(err);
+                this.emit('end');
+            }
+        }))
+        .pipe(gulp.dest(paths.distContentProd));
+});
+
+/**
+ * Processes application css to dev dist path
+ */
+gulp.task('css-dev', function() {
+    return gulp.src('./src/content/*.css')
+        .pipe(plumber({
+            errorHandler: function (err) {
+                console.log(err);
+                this.emit('end');
+            }
+        }))
+        .pipe(gulp.dest(paths.distContentDev));
+});
+
+
+/**
+ * Copies html partials files to dist path
+ */
+gulp.task('html', function () {
+    return gulp.src(paths.partials)
+        .pipe(plumber({
+            errorHandler: function (err) {
+                console.log(err);
+                this.emit('end');
+            }
+        }))
+        .pipe(gulp.dest(paths.distScriptsProd));
+});
+
+/**
+ * Copies html partials files to dev dist path
+ */
+gulp.task('html-dev', function() {
+    return gulp.src(paths.partials)
+        .pipe(plumber({
+            errorHandler: function (err) {
+                console.log(err);
+                this.emit('end');
+            }
+        }))
+        .pipe(gulp.dest(paths.distScriptsDev));
+});
+
+/**
+ * Injects release files into index.html
+ */
+gulp.task('inject', ['scripts', 'css', 'html', 'vendor'], function(){
+    return gulp.src(paths.index)
+        .pipe(gulp.dest(paths.distProd))
+        .pipe(inject(gulp.src('./dist.prod/vendor/*.js', {read: false}), {name: 'bower', relative: true}))
+        .pipe(inject(gulp.src('./dist.prod/vendor/*.css', {read: false}), {name: 'bower', relative: true}))
+        .pipe(inject(gulp.src('./dist.prod/scripts/app.js', {read: false}), {relative: true}))
+        .pipe(inject(gulp.src('./dist.prod/content/*.css', {read: false}), {relative: true}))
+        .pipe(gulp.dest(paths.distProd));
+});
+
+
+/**
+ * Updates the index.html file
+ * with all the injections
+ */
+gulp.task('inject-dev', ['create-dev'], function(){
+    return gulp.src(paths.index)
+        .pipe(plumber({
+            errorHandler: function (err) {
+                console.log(err);
+                this.emit('end');
+            }
+        }))
+        .pipe(gulp.dest(paths.distDev))
+        .pipe(inject(gulp.src([paths.distScriptsDev + '/**/*.module.js', paths.distScriptsDev + '/**/*.js'], {read: false}), {relative: true, name: ''}))
+        .pipe(inject(gulp.src('./dist.dev/vendor/*.js', {read: false}), {name: 'bower', relative: true}))
+        .pipe(inject(gulp.src('./dist.dev/vendor/*.css', {read: false}), {name: 'bower', relative: true}))
+        .pipe(inject(gulp.src(paths.distContentDev + '/**/*.css',{read:false}), {relative: true}))
+        .pipe(gulp.dest(paths.distDev));
+});
+
+/**
+ * Creates development environment for testing
+ */
+gulp.task('create-dev', ['index-dev', 'vendor-dev', 'css-dev', 'html-dev', 'scripts-dev']);
+
+/**
+ * Builds a distribustion
+ */
+gulp.task('build', ['inject']);
+
+/**
+ * Builds a development distribution
+ */
+gulp.task('build-dev', ['inject-dev']);
 
 /**
  * Cleans the build folder
  */
 gulp.task('clean', function() {
-    del(buildFolder + '**');
+    var deferred = Q.defer();
+    del(paths.distProd, function() {
+        deferred.resolve();
+    });
+    return deferred.promise;
 });
 
 /**
- * Concats application js files into app.js
+ * Removes all of dev dist files
  */
-gulp.task('concat', function () {
-    return gulp.src(['src/app/**/*.module.js', 'src/app/**/*.js', '!src/app/**/*.spec.js'])
-        .pipe(concat('app.js'))
-        .pipe(ngAnnotate())
-        .pipe(gulp.dest(buildFolder));
+gulp.task('clean-dev', function() {
+    var deferred = Q.defer();
+    del(paths.distDev, function() {
+        deferred.resolve();
+    });
+    return deferred.promise;
 });
 
 /**
- * Copies application css to build folder
+ * Watches for file changes and rebuilds a development distribustion on change
  */
-gulp.task('css', function () {
-    return gulp.src('./src/content/*.css')
-        .pipe(gulp.dest('./build/content'));
+gulp.task('watch-dev', function() {
+    livereload.listen();
+    gulp.watch([paths.scripts, paths.partials, paths.styles, paths.index], ['build-dev']);
 });
 
 /**
- * Copies application css to build folder
+ * Runs a static webserver for development files
  */
-gulp.task('images', function () {
-    return gulp.src('./src/content/*.png')
-        .pipe(gulp.dest('./build/content'));
-});
-
-/**
- * Copies html files to build folder
- */
-gulp.task('html', function () {
-    return gulp.src('./src/app/**/*.html')
-        .pipe(gulp.dest('./build/app'));
-});
-
-// Development Build Tasks
-/**
- * Updates the index.html file
- * with all the injections
- */
-gulp.task('injectDev', function(){
-    return gulp.src('./src/index.html')
-        .pipe(inject(gulp.src(['./src/app/**/*.module.js','./src/app/**/*.js','!./src/app/**/*.spec.js'], {read: false}), {relative: true, name: ''}))
-        .pipe(inject(gulp.src(bowerFiles({debugging: true}), {read: false}), {name: 'bower', relative: true}))
-        .pipe(inject(gulp.src('./src/content/*.css',{read:false}), {relative: true}))
-        .pipe(gulp.dest('./src'));
-});
-
-
-
-
-gulp.task('build', ['inject', 'images']);
-
-gulp.task('buildDev', ['injectDev']);
-
-gulp.task('deploy', ['build'], function(){
-    return gulp.src('./build/**/*')
-        .pipe(ghPages());
+gulp.task('serve', ['build-dev', 'watch-dev'], function() {
+    gulp.src('./dist.dev/')
+        .pipe(webserver({
+            fallback: 'index.html',
+            livereload: true,
+            directoryListing: false,
+            open: true
+        }));
 });
