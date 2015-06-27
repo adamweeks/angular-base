@@ -20,7 +20,7 @@ var buildFolder = __dirname + '/' + buildFolderName + '/';
 var releaseFolder = __dirname + '/' + releaseFolderName + '/';
 
 var paths = {
-    scripts: 'src/app/**/*.js',
+    scripts: ['src/app/**/*.module.js', 'src/app/**/*.js', '!src/app/**/*.spec.js'],
     styles: './src/content/**/*.css',
     index: './src/index.html',
     partials: ['src/app/**/*.html', '!src/index.html'],
@@ -29,7 +29,9 @@ var paths = {
     distVendorDev: './dist.dev/vendor',
     distScriptsDev: './dist.dev/app',
     distProd: './dist.prod',
-    distScriptsProd: './dist.prod/scripts'
+    distContentProd: './dist.prod/content',
+    distScriptsProd: './dist.prod/scripts',
+    distVendorProd: './dist.prod/vendor'
 };
 
 //Tasks
@@ -40,6 +42,9 @@ gulp.task('test', function (done) {
     }, done);
 });
 
+/**
+ * Creates index.html file in  distribution path
+ */
 gulp.task('index',['clean'],function(){
     return gulp.src('./src/index.html')
         .pipe(plumber({
@@ -48,58 +53,12 @@ gulp.task('index',['clean'],function(){
                 this.emit('end');
             }
         }))
-        .pipe(gulp.dest('./build'));
-});
-
-
-/**
- * Copies vendor files from bower to the build/vendor folder
- */
-gulp.task('vendor', function () {
-    return gulp.src(bowerFiles())
-        .pipe(gulp.dest('./build/vendor'));
-});
-
-gulp.task('vendor-dev', function() {
-    return gulp.src(bowerFiles())
-        .pipe(gulp.dest(paths.distVendorDev));
+        .pipe(gulp.dest(paths.distProd));
 });
 
 /**
- * Cleans the build folder
+ * Creates index.html file in development distribution path
  */
-gulp.task('clean', function() {
-    del(buildFolder + '**');
-});
-
-/**
- * Concats application js files into app.js
- */
-gulp.task('concat', function () {
-    return gulp.src(['src/app/**/*.module.js', 'src/app/**/*.js', '!src/app/**/*.spec.js'])
-        .pipe(plumber({
-            errorHandler: function (err) {
-                console.log(err);
-                this.emit('end');
-            }
-        }))
-        .pipe(concat('app.js'))
-        .pipe(ngAnnotate())
-        .pipe(gulp.dest(buildFolder));
-});
-
-gulp.task('concat-dev', function() {
-    return gulp.src(['src/app/**/*.module.js', 'src/app/**/*.js', '!src/app/**/*.spec.js'])
-        .pipe(plumber({
-            errorHandler: function (err) {
-                console.log(err);
-                this.emit('end');
-            }
-        }))
-        .pipe(ngAnnotate())
-        .pipe(gulp.dest(paths.distScriptsDev))
-});
-
 gulp.task('index-dev', function() {
     return gulp.src(paths.index)
         .pipe(plumber({
@@ -112,7 +71,51 @@ gulp.task('index-dev', function() {
 });
 
 /**
- * Copies application css to build folder
+ * Copies vendor files from bower to the build/vendor folder
+ */
+gulp.task('vendor', function () {
+    return gulp.src(bowerFiles())
+        .pipe(gulp.dest(paths.distVendorProd));
+});
+
+gulp.task('vendor-dev', function() {
+    return gulp.src(bowerFiles())
+        .pipe(gulp.dest(paths.distVendorDev));
+});
+
+/**
+ * Compiles project application scripts into app.js and writes to distribution path
+ */
+gulp.task('scripts', function () {
+    return gulp.src(paths.scripts)
+        .pipe(plumber({
+            errorHandler: function (err) {
+                console.log(err);
+                this.emit('end');
+            }
+        }))
+        .pipe(concat('app.js'))
+        .pipe(ngAnnotate())
+        .pipe(gulp.dest(paths.distScriptsProd));
+});
+
+/**
+ * Compiles project application scripts into the development distribustion location
+ */
+gulp.task('scripts-dev', function() {
+    return gulp.src(paths.scripts)
+        .pipe(plumber({
+            errorHandler: function (err) {
+                console.log(err);
+                this.emit('end');
+            }
+        }))
+        .pipe(ngAnnotate())
+        .pipe(gulp.dest(paths.distScriptsDev))
+});
+
+/**
+ * Processes application css to dist path
  */
 gulp.task('css', function () {
     return gulp.src('./src/content/*.css')
@@ -122,9 +125,12 @@ gulp.task('css', function () {
                 this.emit('end');
             }
         }))
-        .pipe(gulp.dest('./build/content'));
+        .pipe(gulp.dest(paths.distContentProd));
 });
 
+/**
+ * Processes application css to dev dist path
+ */
 gulp.task('css-dev', function() {
     return gulp.src('./src/content/*.css')
         .pipe(plumber({
@@ -136,28 +142,24 @@ gulp.task('css-dev', function() {
         .pipe(gulp.dest(paths.distContentDev));
 });
 
-/**
- * Copies application css to build folder
- */
-gulp.task('images', function () {
-    return gulp.src('./src/content/*.png')
-        .pipe(gulp.dest('./build/content'));
-});
 
 /**
- * Copies html files to build folder
+ * Copies html partials files to dist path
  */
 gulp.task('html', function () {
-    return gulp.src('./src/app/**/*.html')
+    return gulp.src(paths.partials)
         .pipe(plumber({
             errorHandler: function (err) {
                 console.log(err);
                 this.emit('end');
             }
         }))
-        .pipe(gulp.dest('./build/app'));
+        .pipe(gulp.dest(paths.distScriptsProd));
 });
 
+/**
+ * Copies html partials files to dev dist path
+ */
 gulp.task('html-dev', function() {
     return gulp.src(paths.partials)
         .pipe(plumber({
@@ -172,14 +174,14 @@ gulp.task('html-dev', function() {
 /**
  * Injects release files into index.html
  */
-gulp.task('inject', ['concat', 'css', 'html', 'vendor'], function(){
-    return gulp.src('./src/index.html')
-        .pipe(gulp.dest('./build'))
-        .pipe(inject(gulp.src('./build/vendor/*.js', {read: false}), {name: 'bower', relative: true}))
-        .pipe(inject(gulp.src('./build/vendor/*.css', {read: false}), {name: 'bower', relative: true}))
-        .pipe(inject(gulp.src('./build/app.js', {read: false}), {relative: true}))
-        .pipe(inject(gulp.src('./build/content/*.css', {read: false}), {relative: true}))
-        .pipe(gulp.dest('./build'));
+gulp.task('inject', ['scripts', 'css', 'html', 'vendor'], function(){
+    return gulp.src(paths.index)
+        .pipe(gulp.dest(paths.distProd))
+        .pipe(inject(gulp.src('./dist.prod/vendor/*.js', {read: false}), {name: 'bower', relative: true}))
+        .pipe(inject(gulp.src('./dist.prod/vendor/*.css', {read: false}), {name: 'bower', relative: true}))
+        .pipe(inject(gulp.src('./dist.prod/scripts/app.js', {read: false}), {relative: true}))
+        .pipe(inject(gulp.src('./dist.prod/content/*.css', {read: false}), {relative: true}))
+        .pipe(gulp.dest(paths.distProd));
 });
 
 
@@ -203,18 +205,35 @@ gulp.task('inject-dev', ['create-dev'], function(){
         .pipe(gulp.dest(paths.distDev));
 });
 
-gulp.task('create-dev', ['index-dev', 'vendor-dev', 'css-dev', 'html-dev', 'concat-dev']);
+/**
+ * Creates development environment for testing
+ */
+gulp.task('create-dev', ['index-dev', 'vendor-dev', 'css-dev', 'html-dev', 'scripts-dev']);
 
-gulp.task('build', ['inject', 'images']);
+/**
+ * Builds a distribustion
+ */
+gulp.task('build', ['inject']);
 
+/**
+ * Builds a development distribution
+ */
 gulp.task('build-dev', ['inject-dev']);
 
-gulp.task('deploy', ['build'], function(){
-    return gulp.src('./build/**/*')
-        .pipe(ghPages());
+/**
+ * Cleans the build folder
+ */
+gulp.task('clean', function() {
+    var deferred = Q.defer();
+    del(paths.distProd, function() {
+        deferred.resolve();
+    });
+    return deferred.promise;
 });
 
-// removes all compiled dev files
+/**
+ * Removes all of dev dist files
+ */
 gulp.task('clean-dev', function() {
     var deferred = Q.defer();
     del(paths.distDev, function() {
@@ -223,11 +242,17 @@ gulp.task('clean-dev', function() {
     return deferred.promise;
 });
 
+/**
+ * Watches for file changes and rebuilds a development distribustion on change
+ */
 gulp.task('watch-dev', function() {
     livereload.listen();
     gulp.watch([paths.scripts, paths.partials, paths.styles, paths.index], ['build-dev']);
 });
 
+/**
+ * Runs a static webserver for development files
+ */
 gulp.task('serve', ['build-dev', 'watch-dev'], function() {
     gulp.src('./dist.dev/')
         .pipe(webserver({
